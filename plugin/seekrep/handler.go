@@ -78,6 +78,11 @@ func (k SeekrEPHandler) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *d
 	}
 
 	if k.IsNameError(err) {
+		if isSepQ {
+			for i := range state.Req.Question {
+				state.Req.Question[i].Name = originalSeekrepQuery
+			}
+		}
 		if k.Fall.Through(state.Name()) {
 			return plugin.NextOrFailure(k.Name(), k.Next, ctx, w, r)
 		}
@@ -91,10 +96,13 @@ func (k SeekrEPHandler) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *d
 		return dns.RcodeServerFailure, err
 	}
 
-	if len(records) == 0 {
+	if len(records) == 0 && isSepQ {
 		for i := range state.Req.Question {
 			state.Req.Question[i].Name = originalSeekrepQuery
 		}
+		return plugin.BackendError(ctx, &k, zone, dns.RcodeSuccess, state, nil, plugin.Options{})
+	}
+	if len(records) == 0 {
 		return plugin.BackendError(ctx, &k, zone, dns.RcodeSuccess, state, nil, plugin.Options{})
 	}
 
